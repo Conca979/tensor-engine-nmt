@@ -1,0 +1,20 @@
+[project]
+name = "tensor-engine-nmt"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Duong", email = "tn7956666@gail.com" }
+]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "tqdm>=4.64",
+]
+
+[project.scripts]
+tensor-engine-nmt = "tensor_engine_nmt:main"
+
+[build-system]
+requires = ["uv_build>=0.12.3,<0.13.0"]
+build-backend = "uv_build"

@@ -1,0 +1,47 @@
+# ── Byte-compiled / optimized / ambient files ──
+__pycache__/
+*.py[cod]
+*$py.class
+build/
+dist/
+wheels/
+*.egg-info/
+
+# ── Virtual Environments ──
+.venv/
+venv/
+env/
+
+# ── Datasets (Too large for Git - attach as Kaggle Dataset) ──
+PhoMT_dataset/*
+!PhoMT_dataset/download.txt
+*.pkl
+
+# ── Checkpoints & Model Weights (Saved to /kaggle/working/ or Drive) ──
+checkpoints/
+*.npz
+state.txt
+
+# ── Auto-generated Tokenizer Vocabularies ──
+bpe_vocab/
+bpe_vocab_smoke/
+
+# ── Training Logs & Evaluation Dumps ──
+*.log
+train_logs.txt
+evaluation_result.txt
+
+# ── Testing & Testing Scratch ──
+test/test.py
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ── IDEs & OS Specific ──
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
