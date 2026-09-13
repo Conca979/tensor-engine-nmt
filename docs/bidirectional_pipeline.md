@@ -1,7 +1,6 @@
-# Unidirectional Seq2Seq LSTM — Complete Pipeline
+# Bidirectional Seq2Seq LSTM — Complete Pipeline
 
-**Architecture:** Stacked unidirectional LSTM encoder + stacked unidirectional LSTM decoder + Luong
-"general" attention + shared BPE vocabulary  
+**Architecture:** Stacked bidirectional LSTM encoder + stacked unidirectional LSTM decoder + Luong's general attention. + shared BPE vocabulary  
 **Implementation target:** NumPy / CuPy from scratch (no autograd framework)  
 **Dtype:** `float32` throughout (all weights, activations, embeddings). Integer tensors (`X`, `Yin`, `Yout`, `Xlen`, `Ylen`) are `int32`.  
 **Teacher forcing:** Inverse sigmoid decay schedule (Bengio et al., 2015)  
@@ -195,30 +194,33 @@ discrete token id (an integer with no mathematical meaning) into a continuous
 **What leaves here:** `H ∈ (B, Tx, d)` — the full encoder memory — and the
 final hidden/cell states per layer for the handoff.
 
-This is **unidirectional**: a single left-to-right pass, `t = 1 → Tx`.
+This is **bidirectional**: a forward pass (`t = 1 → Tx`) and a backward pass (`t = Tx → 1`). The hidden size `d` is split in half (`d_half = d/2`) for each direction so their concatenation equals `d`.
 
 ### 2a. Weight matrices (allocated once, outside the loop)
 
-One full set of weights per layer. Layer 1 receives embeddings (`e`-wide input);
-every layer above receives the previous layer's hidden state (`d`-wide input).
+One full set of forward and backward weights per layer. Layer 1 receives embeddings (`e`-wide input);
+every layer above receives the previous layer's concatenated hidden state (`d`-wide input).
 
 | Symbol | Shape | Example (layer 1) | Example (layer 2) | Meaning |
 |---|---|---|---|---|
-| `W_ih^enc[1]` | `(e, 4d)` | `(512, 4096)` | — | Input-to-Hidden weights, layer 1 |
-| `W_ih^enc[l]` for `l >= 2` | `(d, 4d)` | — | `(1024, 4096)` | Input-to-Hidden weights, deeper layers |
-| `W_hh^enc[l]` | `(d, 4d)` | `(1024, 4096)` | `(1024, 4096)` | Hidden-to-Hidden weights, all layers |
-| `b^enc[l]` | `(4d,)` | `(4096,)` | `(4096,)` | Bias for all gates combined |
+| `W_ih^enc[1]` | `(e, 4 * d/2)` | `(512, 2048)` | — | Input-to-Hidden weights, layer 1 |
+| `W_ih^enc[l]` for `l >= 2` | `(d, 4 * d/2)` | — | `(1024, 2048)` | Input-to-Hidden weights, deeper layers |
+| `W_hh^enc[l]` | `(d/2, 4 * d/2)`| `(512, 2048)` | `(512, 2048)` | Hidden-to-Hidden weights, all layers |
+| `b^enc[l]` | `(4 * d/2,)` | `(2048,)` | `(2048,)` | Bias for all gates combined |
 
-**Why `4d` on the output axis?**  
+*(Note: There are two sets of these per layer, e.g., `W_ih_fwd` and `W_ih_bwd`)*
+
+**Why `4 * d/2` on the output axis?**  
 One LSTM cell computes four gate pre-activations — forget (`f`), input (`i`),
-gate (`g`), output (`o`) — each `d`-wide. Fusing them into one big matmul
-(`→ 4d`) and then splitting is faster than four separate matmuls.
+gate (`g`), output (`o`) — each `d/2`-wide. Fusing them into one big matmul
+(`→ 4 * d/2 = 2d`) and then splitting is faster than four separate matmuls.
 
 ### 2b. Initialization (before the loop)
 
 ```
-h_0^enc[l] = zeros(B, d)   for l = 1, 2, 3    →  (64, 1024) each
-C_0^enc[l] = zeros(B, d)   for l = 1, 2, 3    →  (64, 1024) each
+# For both forward and backward directions
+h_0^enc[l] = zeros(B, d/2)   for l = 1, 2, 3    →  (64, 512) each
+C_0^enc[l] = zeros(B, d/2)   for l = 1, 2, 3    →  (64, 512) each
 ```
 
 ### 2c. Inside the loop — encoder step `t`, layer `l`
@@ -227,33 +229,33 @@ C_0^enc[l] = zeros(B, d)   for l = 1, 2, 3    →  (64, 1024) each
 
 ```
 input_t^enc[1]  = x_t                  (B, e) = (64, 512)   ← embeddings feed layer 1
-input_t^enc[l]  = h_t^enc[l-1]         (B, d) = (64, 1024)   ← layer l-1's output feeds layer l
+input_t^enc[l]  = h_t^enc[l-1]         (B, d) = (64, 1024)   ← layer l-1's concatenated output feeds layer l
 ```
 
-**Gate pre-activations (the expensive matmul):**
+**Gate pre-activations (the expensive matmul) for forward direction:**
 
 ```
-gates^enc[l] = input_t^enc[l] @ W_ih^enc[l]
-             + h_(t-1)^enc[l] @ W_hh^enc[l]
-             + b^enc[l]
+gates_fwd^enc[l] = input_t^enc[l] @ W_ih_fwd^enc[l]
+                 + h_(t-1)_fwd^enc[l] @ W_hh_fwd^enc[l]
+                 + b_fwd^enc[l]
 ```
 
 Shape breakdown:
 
 ```
-input_t^enc[1] @ W_ih^enc[1]  :  (64, 512) @ (512, 4096)  →  (64, 4096)
-h_(t-1)^enc[1] @ W_hh^enc[1] :  (64, 1024) @ (1024, 4096)  →  (64, 4096)
-b^enc[1]                      :  broadcast (4096,)         →  (64, 4096)
-gates^enc[1]                  :  (64, 4096)
+input_t^enc[1] @ W_ih_fwd^enc[1]     :  (64, 512) @ (512, 2048)  →  (64, 2048)
+h_(t-1)_fwd^enc[1] @ W_hh_fwd^enc[1] :  (64, 512) @ (512, 2048)  →  (64, 2048)
+b_fwd^enc[1]                         :  broadcast (2048,)        →  (64, 2048)
+gates_fwd^enc[1]                     :  (64, 2048)
 ```
 
-For layer 2 and 3, the first term uses `(64, 1024) @ (1024, 4096)` instead — both
-shapes produce the same `(64, 4096)` output.
+For layer 2 and 3, the first term uses `(64, 1024) @ (1024, 2048)` instead — both
+shapes produce the same `(64, 2048)` output.
 
 **Split and activate:**
 
 ```
-f_t, i_t, g_t, o_t = split(gates^enc[l], 4, axis=1)   # each (B, d) = (64, 1024)
+f_t, i_t, g_t, o_t = split(gates_fwd^enc[l], 4, axis=1)   # each (B, d/2) = (64, 512)
 f_t = σ(f_t)    # forget gate  — how much of the old cell state to keep
 i_t = σ(i_t)    # input gate   — how much of the new candidate to write
 g_t = tanh(g_t) # gate         — the new candidate values
@@ -263,8 +265,16 @@ o_t = σ(o_t)    # output gate  — how much of the cell to expose as hidden sta
 **Update cell and hidden states:**
 
 ```
-C_t^enc[l] = f_t * C_(t-1)^enc[l] + i_t * g_t    →  (B, d) = (64, 1024)
-h_t^enc[l] = o_t * tanh(C_t^enc[l])               →  (B, d) = (64, 1024)
+C_t_fwd^enc[l] = f_t * C_(t-1)_fwd^enc[l] + i_t * g_t    →  (B, d/2) = (64, 512)
+h_t_fwd^enc[l] = o_t * tanh(C_t_fwd^enc[l])               →  (B, d/2) = (64, 512)
+```
+
+*(The backward pass computes `h_t_bwd^enc[l]` and `C_t_bwd^enc[l]` identically but iterating `Tx → 1`)*
+
+**Concatenation:**
+```
+h_t^enc[l] = [h_t_fwd^enc[l] ; h_t_bwd^enc[l]]           →  (B, d) = (64, 1024)
+C_t^enc[l] = [C_t_fwd^enc[l] ; C_t_bwd^enc[l]]           →  (B, d) = (64, 1024)
 ```
 
 `*` here is element-wise (Hadamard) multiplication.
@@ -279,8 +289,8 @@ h_t^enc[l] = o_t * tanh(C_t^enc[l])               →  (B, d) = (64, 1024)
 
 ### 2d. Collecting encoder outputs
 
-After the full loop over `t = 1…Tx` and all `L=3` layers, collect the top
-layer's `(B, d)` hidden state at every timestep:
+After the full loop over `t = 1…Tx` (both directions) and all `L=3` layers, collect the top
+layer's `(B, d)` concatenated hidden state at every timestep:
 
 ```
 H = stack([h_1^enc[L], h_2^enc[L], ..., h_Tx^enc[L]], axis=1)
@@ -291,18 +301,18 @@ H = stack([h_1^enc[L], h_2^enc[L], ..., h_Tx^enc[L]], axis=1)
 The decoder's attention mechanism will query every row of `H` at each decode step.
 
 **Total encoder work per batch:**  
-`Tx` iterations × `L` layers × 1 direction = `20 × 3 × 1 = 60` LSTM-cell
+`Tx` iterations × `L` layers × 2 directions = `20 × 3 × 2 = 120` LSTM-cell
 computations.
 
 ---
 
 ## Stage 3 — Encoder→Decoder Handoff
 
-**What enters here:** the final hidden/cell states of the encoder.  
+**What enters here:** the final concatenated hidden/cell states of the encoder.  
 **What leaves here:** `h_0^dec[l]` and `C_0^dec[l]` — the decoder's starting states.
 
 The decoder needs a starting hidden and cell state for each of its `L` layers.
-We seed them from the encoder's **last meaningful** hidden/cell state — "last
+We seed them from the encoder's **last meaningful** concatenated hidden/cell state — "last
 meaningful" because of padding: example `b`'s encoder ran meaningful tokens
 only for positions `0…Xlen[b]-1`. Positions after that are padding.
 
@@ -319,10 +329,9 @@ idx = Xlen - 1                                    # (B,) — 0-indexed last real
 h_final = h_enc_all[np.arange(B), idx, :]        # (B, d)
 ```
 
-**Handoff (unidirectional — no bridge projection needed):**
+**Handoff (bidirectional concatenation — no bridge projection needed):**
 
-Because the encoder is unidirectional, its final states are already `d`-wide —
-exactly the size the decoder expects. No projection required.
+Because the bidirectional encoder concatenates the forward and backward passes (`d/2 + d/2 = d`), its final states are already `d`-wide — exactly the size the decoder expects. No linear projection layer is required.
 
 ```
 h_0^dec[l] = h_final^enc[l]    →  (B, d) = (64, 1024)
@@ -331,7 +340,7 @@ C_0^dec[l] = C_final^enc[l]    →  (B, d) = (64, 1024)
 
 This is done once per batch, per layer, before the decoder loop starts.  
 **Total handoff cost:** 2 gathers (one for `h`, one for `C`) × `L = 3` layers = 6 gathers.
-Zero matmuls — this is the simplicity advantage of unidirectional.
+Zero matmuls — this is the simplicity advantage of concatenating `d/2` dimensions.
 
 ---
 

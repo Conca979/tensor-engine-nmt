@@ -1,8 +1,8 @@
-# Unidirectional Seq2Seq LSTM NMT — Implementation Plan (As-Built)
+# Bidirectional Seq2Seq LSTM NMT — Implementation Plan (As-Built)
 
 > **Status:** Implementation complete. This document reflects the **actual codebase**,
 > not the original design sketch. Differences from the original plan are marked with a warning symbol.
-> Cross-reference: `docs/unidirectional_pipeline.md` for the mathematical walkthrough.
+> Cross-reference: `docs/bidirectional_pipeline.md` for the mathematical walkthrough.
 
 ---
 
@@ -55,7 +55,7 @@
 | d | 512 | 1,024 | CHANGED — Doubled for T4 VRAM budget |
 | L | 2 | 3 | CHANGED — +1 layer for complex EN to VI grammar |
 | B | 64 (fixed) | dynamic via max_tokens=4000 | CHANGED — Dynamic token batching replaces fixed batch size |
-| k | 2,000 | 20,000.0 | CHANGED — Higher decay constant for smooth curriculum |
+| k | 20,000 | 17,000.0 | CHANGED |
 | lr | 3e-4 | 3e-4 | Unchanged |
 | beta1 | 0.9 | 0.9 | Unchanged |
 | beta2 | 0.999 | 0.999 | Unchanged |
@@ -97,7 +97,7 @@ test/
 
 docs/
 ├── implementation_plan.md     <- This file (as-built reference)
-├── unidirectional_pipeline.md <- Mathematical spec (unchanged)
+├── bidirectional_pipeline.md  <- Mathematical spec
 └── training_guide.md          <- Operational guide: resume, checkpoints, Colab
 ```
 

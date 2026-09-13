@@ -30,7 +30,7 @@ class HParams:
     max_epochs: int = 30
 
     # ── Optimiser ───────────────────────────────────────────────────────────
-    lr: float = 3e-4
+    lr: float = 1e-4
     beta1: float = 0.9
     beta2: float = 0.999
     eps_adam: float = 1e-8
@@ -38,7 +38,7 @@ class HParams:
 
     # ── Inference ───────────────────────────────────────────────────────────
     beam_width: int = 4
-    max_decode_len: int = 100
+    max_decode_len: int = 30
 
     # ── Logging / checkpointing ──────────────────────────────────────────────
     log_every: int = 100
