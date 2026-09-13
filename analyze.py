@@ -1,4 +1,5 @@
 import sys
+import os
 import re
 import math
 import statistics
@@ -47,7 +48,11 @@ def analyze_logs():
     print("==================================================================")
     print("                 TRAINING LOGS (train_logs.txt)                   ")
     print("==================================================================")
-    with open('train_logs.txt', 'r', encoding='utf-8', errors='ignore') as f:
+    log_path = os.path.join('checkpoints', 'train_logs.txt')
+    if not os.path.exists(log_path):
+        print(f"Log file not found at {log_path}")
+        return
+    with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
         text = f.read()
 
     # Pre-process: split concatenated lines like "...tok/s=1,1402026-09-10..."
@@ -120,28 +125,32 @@ def analyze_logs():
         print(f"  Throughput: mean={statistics.mean(toks):.1f} tok/s (median={statistics.median(toks):.1f})")
 
     # Trace significant speed and loss transitions
+    # Trace significant speed and loss transitions dynamically
     print("\n--- Phase Transitions & Notable Events in Logs ---")
-    # Step 100 - 5400
-    p1 = [e for e in parsed_logs if e['step'] <= 5400]
-    p2 = [e for e in parsed_logs if 5500 <= e['step'] <= 50000]
-    p3 = [e for e in parsed_logs if 50100 <= e['step'] <= 63300]
-    p4 = [e for e in parsed_logs if e['step'] >= 63400]
-
-    print(f"Phase 1 (Steps 100 - 5,400):")
-    print(f"  Mean tok/s: {statistics.mean([e['toks'] for e in p1]):.1f}, Mean loss: {statistics.mean([e['loss'] for e in p1]):.4f}")
-    print(f"  Note: High speed ~1,700 tok/s. This was early training before batch complexity or older config.")
-    
-    print(f"\nPhase 2 (Steps 5,500 - 50,000):")
-    print(f"  Mean tok/s: {statistics.mean([e['toks'] for e in p2]):.1f}, Mean loss: {statistics.mean([e['loss'] for e in p2]):.4f}")
-    print(f"  Note: Steady training ~1,100 tok/s. Loss steadily dropped from 4.64 down to 2.44.")
-
-    print(f"\nPhase 3 (Steps 50,100 - 63,300):")
-    print(f"  Mean tok/s: {statistics.mean([e['toks'] for e in p3]):.1f}, Mean loss: {statistics.mean([e['loss'] for e in p3]):.4f}")
-    print(f"  Note: Loss reached lowest values (2.15 - 2.25). Gradient norms stable at 0.65 - 0.75.")
-
-    print(f"\nPhase 4 (Steps 63,400 - 64,500):")
-    print(f"  Mean tok/s: {statistics.mean([e['toks'] for e in p4]):.1f}, Mean loss: {statistics.mean([e['loss'] for e in p4]):.4f}")
-    print(f"  Note: tok/s dropped from ~1,100 to ~750 tok/s. Loss rose from 2.15 to 2.45-2.52.")
+    total_len = len(parsed_logs)
+    if total_len > 0:
+        num_phases = min(4, total_len)
+        chunk_size = total_len // num_phases
+        for i in range(num_phases):
+            start_idx = i * chunk_size
+            end_idx = (i + 1) * chunk_size if i < num_phases - 1 else total_len
+            phase_logs = parsed_logs[start_idx:end_idx]
+            if phase_logs:
+                mean_toks = statistics.mean([e['toks'] for e in phase_logs])
+                mean_loss = statistics.mean([e['loss'] for e in phase_logs])
+                start_step = phase_logs[0]['step']
+                end_step = phase_logs[-1]['step']
+                print(f"Phase {i+1} (Steps {start_step} - {end_step}):")
+                print(f"  Mean tok/s: {mean_toks:.1f}, Mean loss: {mean_loss:.4f}")
+                
+                # Basic heuristic notes based on observed loss and throughput
+                if i == 0:
+                    print("  Note: Initial training phase. Loss typically drops rapidly.")
+                elif mean_toks < statistics.mean([e['toks'] for e in parsed_logs]) * 0.8:
+                    print("  Note: Throughput dropped significantly in this phase. Possible longer sequences or batching changes.")
+                elif mean_loss <= min_loss_entry['loss'] * 1.05:
+                    print("  Note: Model reaching lowest loss region. Gradient norms should be stabilizing.")
+                print()
 
     # Teacher forcing schedule in logs
     epsilons = [e['eps'] for e in parsed_logs]
