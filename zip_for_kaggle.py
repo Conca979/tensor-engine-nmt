@@ -18,7 +18,7 @@ import zipfile
 
 def zip_code():
     out_zip = "tensor-engine-nmt-code.zip"
-    items = ["src", "test", "bpe_vocab", "pyproject.toml", "requirements.txt", "README.md", "COLAB_GUIDE.md", "KAGGLE_GUIDE.md"]
+    items = ["src", "test", "bpe_vocab", "pyproject.toml", "README.md", "COLAB_GUIDE.md", "KAGGLE_GUIDE.md"]
     print(f"Packaging codebase into {out_zip}...")
     with zipfile.ZipFile(out_zip, "w", zipfile.ZIP_DEFLATED) as zf:
         for item in items:
