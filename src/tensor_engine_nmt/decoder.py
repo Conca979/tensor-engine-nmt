@@ -81,9 +81,10 @@ class DecoderLSTM:
     # ── Helpers ───────────────────────────────────────────────────────────────
 
     @staticmethod
-    def _teacher_forcing_prob(global_step: int, k: float) -> float:
-        """ε_i = k / (k + exp(i/k))"""
-        return float(k / (k + np.exp(global_step / k)))
+    def _teacher_forcing_prob(global_step: int, k: float, min_tf: float = 0.0) -> float:
+        """ε_i = max(min_tf, k / (k + exp(i/k)))"""
+        raw_prob = float(k / (k + np.exp(global_step / k)))
+        return max(min_tf, raw_prob)
 
     # ── Forward pass ─────────────────────────────────────────────────────────
 
@@ -130,8 +131,8 @@ class DecoderLSTM:
             C_dec.append(C_f.copy())
 
         # ── Teacher forcing probability for this batch ────────────────────────
-        # Enforce the anchor threshold (never drop below 0.70 - 0.75 in NMT)    
-        epsilon = max(0.7, self._teacher_forcing_prob(global_step, hp.k))
+        # Enforce the anchor threshold via hp.min_tf (prevent exposure bias trap)
+        epsilon = self._teacher_forcing_prob(global_step, hp.k, getattr(hp, "min_tf", 0.7))
 
         # ── Initialise caches ─────────────────────────────────────────────────
         h_cache    = [[None] * (Ty + 1) for _ in range(L)]

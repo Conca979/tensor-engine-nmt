@@ -24,6 +24,7 @@ from .config import cfg, HParams
 from .bpe import load_or_train_bpe
 from .dataset import PhoMTDataset
 from .model import Seq2Seq
+from .decoder import DecoderLSTM
 from .optimizer import Adam
 
 
@@ -178,7 +179,9 @@ def train(hp: HParams = cfg, max_steps: int = None, resume: str = None) -> None:
             if global_step % hp.log_every == 0:
                 elapsed   = time.time() - t0 + 1e-9
                 tok_per_s = epoch_tokens / elapsed
-                eps_i     = hp.k / (hp.k + np.exp(global_step / hp.k))
+                eps_i     = DecoderLSTM._teacher_forcing_prob(
+                    global_step, hp.k, getattr(hp, "min_tf", 0.7)
+                )
                 avg_loss  = epoch_loss / epoch_steps
                 log_msg = (
                     f"ep {epoch+1}/{hp.max_epochs} | "
@@ -226,9 +229,15 @@ def main_train():
     parser.add_argument("--resume",    type=str, default=None, help="Path to checkpoint .npz")
     parser.add_argument("--lr",         type=float, default=cfg.lr)
     parser.add_argument("--max-tokens", type=int,   default=getattr(cfg, 'max_tokens', 4000))
+    parser.add_argument("--min-tf",     type=float, default=getattr(cfg, 'min_tf', 0.7), help="Minimum teacher-forcing ratio floor")
     args = parser.parse_args()
 
     import dataclasses
     
-    hp = dataclasses.replace(cfg, lr=args.lr, max_tokens=args.max_tokens)
+    hp = dataclasses.replace(
+        cfg,
+        lr=args.lr,
+        max_tokens=args.max_tokens,
+        min_tf=args.min_tf,
+    )
     train(hp=hp, max_steps=args.max_steps, resume=args.resume)

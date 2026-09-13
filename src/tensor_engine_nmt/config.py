@@ -25,7 +25,8 @@ class HParams:
     # ── Training ────────────────────────────────────────────────────────────
     max_tokens: int = 4000   # maximum tokens per batch
     B: int = 64              # default batch size (used for unit testing and fixed-batch evaluation)
-    k: float = 20_000.0     # inverse-sigmoid teacher-forcing decay constant
+    k: float = 17_000.0     # inverse-sigmoid teacher-forcing decay constant
+    min_tf: float = 0.7      # minimum teacher-forcing ratio floor (scheduled sampling lower bound)
     max_epochs: int = 30
 
     # ── Optimiser ───────────────────────────────────────────────────────────
@@ -33,7 +34,7 @@ class HParams:
     beta1: float = 0.9
     beta2: float = 0.999
     eps_adam: float = 1e-8
-    clip_norm: float = 5.0
+    clip_norm: float = 2.0
 
     # ── Inference ───────────────────────────────────────────────────────────
     beam_width: int = 4
