@@ -6,6 +6,7 @@ build/
 dist/
 wheels/
 *.egg-info/
+*.zip
 
 # ── Virtual Environments ──
 .venv/
@@ -36,6 +37,9 @@ test/test.py
 .pytest_cache/
 .coverage
 htmlcov/
+
+# ── Draft ──
+draft.txt
 
 # ── IDEs & OS Specific ──
 .idea/
