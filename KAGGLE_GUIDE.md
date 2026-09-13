@@ -205,8 +205,7 @@ print(f"Found code directory at: {code_dir}")
 # 3. Enter directory and install dependencies
 os.chdir('/kaggle/working')
 sys.path.insert(0, '/kaggle/working/src')
-!pip install -q cupy-cuda12x
-!pip install -q -e .
+!pip install -q -e .[gpu]
 
 # 4. Strictly verify GPU is detected
 from tensor_engine_nmt.backend import BACKEND
@@ -300,7 +299,7 @@ hp = HParams(
     clip_norm=5.0,
     max_epochs=30,
     beam_width=4,
-    max_decode_len=100,
+    max_decode_len=30,
     log_every=100,
     save_every=2000,
     data_dir='PhoMT_dataset',

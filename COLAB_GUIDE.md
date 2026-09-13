@@ -100,7 +100,7 @@ In the **second cell**, install dependencies:
 
 ```python
 # ── Cell 2: Install dependencies ──────────────────────────────────────────────
-!pip install -q numpy tqdm cupy-cuda12x
+!pip install -q -e .[gpu]
 
 # Verify GPU is available
 import subprocess
@@ -147,7 +147,7 @@ hp = HParams(
     clip_norm=5.0,
     max_epochs=30,
     beam_width=4,
-    max_decode_len=100,
+    max_decode_len=30,
     log_every=100,
     save_every=2000,
     data_dir='PhoMT_dataset',

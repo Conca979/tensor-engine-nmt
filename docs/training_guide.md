@@ -2,7 +2,7 @@
 
 > This document covers the **operational** side of training: how to run it, understand
 > the logs, resume correctly, manage checkpoints, and evaluate the model.
-> For the mathematical spec, see `docs/unidirectional_pipeline.md`.
+> For the mathematical spec, see `docs/bidirectional_pipeline.md`.
 > For architecture decisions, see `docs/implementation_plan.md`.
 
 ---
@@ -53,7 +53,7 @@ The log line `[train] Backend: cupy` or `[train] Backend: numpy` confirms which 
 ```
 114,876,672 parameters total
 
-Encoder: 3-layer unidirectional LSTM
+Encoder: 3-layer bidirectional LSTM
   - Embedding: V × e  =  32,000 × 512
   - Layer 0:   e × 4d  = 512 × 4,096  (input → gates)
   - Layer 1,2: d × 4d  = 1,024 × 4,096

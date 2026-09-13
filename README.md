@@ -2,7 +2,7 @@
 
 A complete Sequence-to-Sequence (Seq2Seq) Neural Machine Translation model built entirely from scratch in **NumPy** and **CuPy**.
 
-This project implements an English-to-Vietnamese translation system using a stacked 3-layer unidirectional LSTM with Luong's General Attention mechanism. It features completely manual backpropagation through time (BPTT), a custom Byte-Pair Encoding (BPE) tokenizer, and a dynamic CPU/GPU backend — all without using modern deep learning frameworks like PyTorch or TensorFlow.
+This project implements an English-to-Vietnamese translation system using a stacked 3-layer **Bidirectional LSTM** encoder and unidirectional LSTM decoder with Luong's General Attention mechanism. It features completely manual backpropagation through time (BPTT), a custom Byte-Pair Encoding (BPE) tokenizer, and a dynamic CPU/GPU backend — all without using modern deep learning frameworks like PyTorch or TensorFlow.
 
 ---
 
