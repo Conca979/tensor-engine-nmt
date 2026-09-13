@@ -92,7 +92,7 @@ def train(hp: HParams = cfg, max_steps: int = None, resume: str = None) -> None:
             logging.info(f"[train] Auto-resumed from {latest} (step {global_step})")
 
     # ── 4. Dataset ───────────────────────────────────────────────────────────
-    dataset = PhoMTDataset(bpe, data_dir=hp.data_dir, split="train", max_len=100)
+    dataset = PhoMTDataset(bpe, data_dir=hp.data_dir, split="train", max_len=30)
 
     # ── 5. Infer epoch position from global_step ─────────────────────────────
     start_epoch = 0
