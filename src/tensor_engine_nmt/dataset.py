@@ -23,7 +23,7 @@ from .bpe import BPETokenizer, PAD_ID, START_ID, END_ID
 
 # ── Length bucket boundaries (by English token count after BPE) ──────────────
 
-BUCKET_BOUNDARIES = [10, 20, 40, 80]   # creates 5 buckets: [0,10), [10,20), [20,40), [40,80), [80,∞)
+BUCKET_BOUNDARIES = [10, 20, 30]   # creates 4 buckets: [0,10), [10,20), [20,30), [30,∞)
 
 
 def _bucket_id(length: int) -> int:
@@ -102,7 +102,7 @@ class PhoMTDataset:
         bpe: BPETokenizer,
         data_dir: str = cfg.data_dir,
         split: str = "train",
-        max_len: int = 100,
+        max_len: int = 30,
     ):
         self.bpe = bpe
         self.en_path = os.path.join(data_dir, split, f"{split}.en")
@@ -168,6 +168,8 @@ class PhoMTDataset:
         total = 0
         for pair in self.pairs:
             en_ids, vi_ids = pair
+            if len(en_ids) > self.max_len or len(vi_ids) > self.max_len:
+                continue
             bid = _bucket_id(len(en_ids))
             buckets[bid].append(pair)
             total += 1
