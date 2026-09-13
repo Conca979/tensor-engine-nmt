@@ -97,7 +97,9 @@ uv run tensor-engine-nmt train
 *Options:*
 - `--lr`: Set the learning rate (default: `3e-4`)
 - `--max-tokens`: Set the dynamic token-level batch size limit (default: `4000`)
+- `--min-tf`: Set the minimum teacher-forcing ratio floor (default: `0.70`)
 - `--max-steps`: Stop training after N gradient steps.
+- `--resume`: Path to a specific `.npz` checkpoint file to resume from.
 
 The training log prints every `log_every` steps:
 ```
@@ -136,12 +138,13 @@ Because the model architecture is defined purely in NumPy/CuPy, you have full co
 | `L` (Layers) | `3` | **[Structural]** Number of stacked LSTM layers. `L=3` provides deep representations. `L=4` might overfit, while `L=1` is too shallow for complex grammar. |
 | `e` (Embedding) | `512` | **[Structural]** Size of the word vectors. `512` gives rich semantic embeddings for complex bilingual vocabularies. |
 | `max_tokens` | `4000` | **[Training]** Dynamic token batching limit. Tuned to maximize a 16GB T4 GPU. Increase this if using an A100 (40GB) to get massive speedups. |
-| `k` (Teacher Forcing) | `20000.0` | **[Training]** Controls how fast the model stops relying on the "true" previous word. A higher `k` keeps teacher forcing active longer for stable early training. |
+| `k` (Teacher Forcing) | `17000.0` | **[Training]** Inverse-sigmoid decay constant. Controls how fast scheduled sampling introduces model predictions. |
+| `min_tf` (Floor) | `0.70` | **[Training]** Minimum teacher forcing ratio floor. Prevents exposure bias collapse by guaranteeing at least 70% ground truth tokens. |
 | `lr` (Learning Rate)| `3e-4` | **[Training]** Base learning rate for Adam. Can be adjusted mid-run if you see the loss plateau. |
 
 > **Resuming Rules:** 
 > ❌ You **cannot** change **[Structural]** parameters if you are resuming from an existing checkpoint. The matrix dimensions in the saved `.npz` file will strictly crash if they do not match the code! You must delete `checkpoints/` to change these.
-> ✅ You **can** safely change **[Training]** parameters (`max_tokens`, `k`, `lr`) at any time when resuming a checkpoint. For example, you can pause training, lower the learning rate, and hit play again!
+> ✅ You **can** safely change **[Training]** parameters (`max_tokens`, `k`, `min_tf`, `lr`) at any time when resuming a checkpoint. For example, you can pause training, lower the learning rate or teacher-forcing floor, and hit play again!
 
 ---
 

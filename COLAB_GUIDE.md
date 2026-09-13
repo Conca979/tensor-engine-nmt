@@ -140,7 +140,8 @@ hp = HParams(
     d=1024,     # LSTM hidden dimension (Increased capacity)
     L=3,        # Stacked LSTM layers (Increased capacity)
     max_tokens=4000, # Dynamic token batching (maximizes T4 16GB VRAM)
-    k=20000.0,  # Teacher forcing decay rate
+    k=17000.0,  # Inverse-sigmoid teacher forcing decay constant
+    min_tf=0.70, # Minimum teacher forcing floor (scheduled sampling lower bound)
     lr=3e-4,    # Learning rate
     beta1=0.9, beta2=0.999, eps_adam=1e-8,
     clip_norm=5.0,

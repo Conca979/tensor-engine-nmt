@@ -112,7 +112,8 @@ These are **fixed for the whole training run**. They never change per batch.
 | `d` | LSTM hidden size (one layer, one direction) | 1024 |
 | `B` | Batch size | Dynamic based on `max_tokens=4000` (e.g. ~64) |
 | `L` | Number of stacked LSTM layers — same for encoder and decoder | 3 |
-| `k` | Inverse sigmoid decay hyperparameter (teacher forcing) | chosen before training, e.g. 20000.0 |
+| `k` | Inverse sigmoid decay hyperparameter (teacher forcing) | 17000.0 |
+| `min_tf` | Minimum teacher-forcing ratio floor (anchor against exposure bias trap) | 0.70 |
 
 **Why "hidden size = `d`" means `4d` gates:**  
 An LSTM has four gates — forget `f`, input `i`, gate `g`, output `o` — each
@@ -346,14 +347,15 @@ being corrected.
 ### The schedule formula
 
 ```
-ε_i = k / (k + exp(i / k))
+ε_i = max(min_tf, k / (k + exp(i / k)))
 ```
 
 | Symbol | Meaning |
 |---|---|
 | `i` | **Global training step** — total number of batches processed since the start of training, counting across all epochs. Starts at `0`, incremented by `1` after every `optimizer.step()`. |
-| `k` | Decay hyperparameter. Larger `k` = slower decay (more teacher forcing for longer). Must be chosen before training. |
-| `ε_i` | Probability of using the **ground-truth** previous token at step `i`. Always in `(0, 1)`. |
+| `k` | Decay hyperparameter. Larger `k` = slower decay (more teacher forcing for longer). Chosen before training (default `17000.0`). |
+| `min_tf` | Minimum teacher forcing floor (default `0.70`). Guarantees at least 70% ground truth to prevent catastrophic exposure bias collapse. |
+| `ε_i` | Probability of using the **ground-truth** previous token at step `i`. Bounded in `[min_tf, 1.0)`. |
 | `1 - ε_i` | Probability of using the **model's own argmax prediction** from the previous decoder step. |
 
 ### Behavior across training
@@ -361,7 +363,7 @@ being corrected.
 ```
 i = 0    →  ε ≈ 1.0   (pure teacher forcing at the start, model hasn't learned anything)
 i = k    →  ε ≈ k/(k + e) ≈ 0.73
-i >> k   →  ε → 0.0   (nearly free-running, model feeds itself)
+i >> k   →  ε = min_tf (default 0.70, anchored to maintain stable target representations)
 ```
 
 ### At t=1 — always teacher forced
@@ -381,10 +383,10 @@ previous argmax output. There is no ground-truth `Yin` available.
 import numpy as np
 
 # Called once per batch, before the decoder loop
-def teacher_forcing_prob(i: int, k: float) -> float:
-    return k / (k + np.exp(i / k))
+def teacher_forcing_prob(i: int, k: float, min_tf: float = 0.0) -> float:
+    return max(min_tf, float(k / (k + np.exp(i / k))))
 
-epsilon = teacher_forcing_prob(global_step, k)   # scalar float
+epsilon = teacher_forcing_prob(global_step, hp.k, hp.min_tf)   # scalar float
 
 # Inside the decoder loop, for t >= 2:
 use_ground_truth = (np.random.rand() < epsilon)   # one coin flip per batch step

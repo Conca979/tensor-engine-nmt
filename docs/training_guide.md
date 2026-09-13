@@ -200,20 +200,20 @@ Each log line format:
 ### About `ε` (teacher forcing)
 
 ```
-ε = k / (k + exp(global_step / k))     k = 2000
+ε = max(min_tf, k / (k + exp(global_step / k)))     k = 17,000, min_tf = 0.70
 ```
 
-| global_step | ε |
-|---|---|
-| 0 | 1.000 (always use gold) |
-| 20,000 | 0.999 |
-| 46,000 | 0.999 |
-| 100,000 | 0.994 |
-| 500,000 | 0.796 |
-| 1,390,590 (30 epochs) | ~0.5 |
+| global_step | Raw decay | Active `ε` (with `min_tf=0.70`) |
+|---|---|---|
+| 0 | 1.000 | 1.000 (pure teacher forcing) |
+| 50,000 | 0.999 | 0.999 |
+| 100,000 | 0.979 | 0.979 |
+| 131,800 (Epoch 3 end) | 0.880 | 0.880 |
+| 151,200 (Epoch 4) | 0.700 | 0.700 |
+| 152,000+ | 0.690 (unconstrained) | **0.700 (anchored at `min_tf`)** |
+| 1,000,000+ | ~0.000 | **0.700 (anchored at `min_tf`)** |
 
-With k=2000, ε decays very slowly — the model mostly uses teacher forcing
-throughout training, which is appropriate for this dataset size.
+The `min_tf` hyperparameter (default `0.70`) acts as a critical anchor floor for NMT. Pure scheduled sampling that decays down to 0% causes compounding error cascades ("exposure bias trap") when training from cross-entropy loss. Setting `min_tf = 0.70` guarantees the model feeds at least 70% ground-truth tokens while allowing 30% free-running exploration.
 
 ---
 
