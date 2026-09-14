@@ -202,11 +202,25 @@ To resume:
 ## Step 9: Run Evaluation
 
 ```python
-# ── Cell 7: Evaluate BLEU score on test set ───────────────────────────────────
+# ── Cell 7: Evaluate BLEU score (Test & Train Sample) ─────────────────────────
 from tensor_engine_nmt.evaluate import evaluate
 
-bleu = evaluate(hp=hp, verbose=True)
-print(f"\nCorpus BLEU-4: {bleu:.2f}")
+# 1. Evaluate on test set (full test set or quick first N sentences)
+bleu_test = evaluate(hp=hp, split="test", verbose=True)
+print(f"\nTest Corpus BLEU-4: {bleu_test:.2f}")
+
+# 2. Overfitting check: Evaluate on a random sample of 500 training sentences
+bleu_train = evaluate(hp=hp, split="train", max_sentences=500, random_sample=True, verbose=False)
+print(f"\nTrain (Random 500 sample) BLEU-4: {bleu_train:.2f}")
+```
+
+Or run via terminal / CLI:
+```bash
+# Evaluate on test set
+!uv run tensor-engine-nmt evaluate --verbose
+
+# Check for overfitting on a random sample of 500 training sentences
+!uv run tensor-engine-nmt evaluate --split train --n 500 --random
 ```
 
 ---

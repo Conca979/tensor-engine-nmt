@@ -115,10 +115,33 @@ uv run tensor-engine-nmt translate
 Type an English sentence and press Enter — the model uses Beam Search to output a Vietnamese translation.
 
 ### 3. Evaluate (Corpus BLEU-4)
-To calculate the BLEU-4 score on your test dataset:
+
+Evaluate translation quality using our scratch-built BLEU-4 implementation:
+
 ```bash
+# Evaluate on test set (auto-finds latest checkpoint)
 uv run tensor-engine-nmt evaluate --verbose
+
+# Fast spot-check on test set (first 100 sentences)
+uv run tensor-engine-nmt evaluate --n 100
+
+# Spot-check for overfitting vs underfitting: evaluate a random sample of 500 training pairs
+uv run tensor-engine-nmt evaluate --split train --n 500 --random --verbose
+
+# Evaluate validation split
+uv run tensor-engine-nmt evaluate --split val --n 500
 ```
+
+#### Evaluation Flags:
+| Flag | Default | Description |
+|---|---|---|
+| `--ckpt PATH` | Latest | Specific `.npz` checkpoint path (auto-sorts numerically by step if omitted). |
+| `--split` | `test` | Dataset split to evaluate: `test`, `train`, or `val`. |
+| `--n` | All | Evaluate only the first / sampled `N` sentences. |
+| `--random` | `False` | Shuffles dataset with a fixed seed (`42`) before picking `N` sentences (ideal for unbiased training set sampling). |
+| `--verbose` | `False` | Prints English source, Model hypothesis, Ground truth reference, and sentence BLEU. |
+
+> **Diagnosing Overfitting vs. Underfitting**: If training loss drops and training BLEU (e.g. `--split train --n 500 --random`) is high while test BLEU is low, the model is overfitting. If both training and test BLEU remain low or grow together, the model is still learning and not yet overfitting.
 
 > **Evaluation Metrics Tradeoff**: This codebase implements **BLEU-4 entirely from scratch** to maintain the "no external ML dependencies" philosophy of the project. While highly educational, BLEU is notoriously rigid for languages with varied pronouns and synonyms (like Vietnamese). It penalizes perfectly valid semantic translations that don't match the reference's exact n-grams (e.g., translating "Are you ready?" as "anh đã sẵn sàng chưa" instead of the reference's "bà đã sẵn sàng chưa" yields a sentence-level BLEU of 0.0). 
 > 

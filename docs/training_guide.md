@@ -339,13 +339,25 @@ uv run tensor-engine-nmt evaluate --ckpt checkpoints/step_46000.npz
 
 # Evaluate only first 100 sentences (fast spot-check)
 uv run tensor-engine-nmt evaluate --n 100
+
+# Overfitting check: Evaluate a random sample of 500 training sentences
+uv run tensor-engine-nmt evaluate --split train --n 500 --random
+
+# Evaluate validation set
+uv run tensor-engine-nmt evaluate --split val --n 500
 ```
 
-In Colab (Cell 7):
+In Colab / Notebook (Cell 7):
 ```python
 from tensor_engine_nmt.evaluate import evaluate
-bleu = evaluate(hp=hp, verbose=True)
-print(f"Corpus BLEU-4: {bleu:.2f}")
+
+# 1. Test set evaluation
+bleu_test = evaluate(hp=hp, split="test", verbose=True)
+print(f"Test Corpus BLEU-4: {bleu_test:.2f}")
+
+# 2. Overfitting check: Evaluate on a random sample of 500 training sentences
+bleu_train = evaluate(hp=hp, split="train", max_sentences=500, random_sample=True, verbose=False)
+print(f"Train Sample BLEU-4: {bleu_train:.2f}")
 ```
 
 ### BLEU-4 limitations for Vietnamese
