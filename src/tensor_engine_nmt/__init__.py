@@ -57,5 +57,5 @@ def _print_help() -> None:
         "Commands:\n"
         "  train      Train the model (--max-steps N  --resume PATH  --lr LR  --min-tf TF)\n"
         "  translate  Interactive translation REPL\n"
-        "  evaluate   Corpus BLEU-4 on test set (--ckpt PATH  --verbose  --n N)\n"
+        "  evaluate   Corpus BLEU-4 evaluation (--ckpt PATH  --verbose  --n N  --split SPLIT  --random)\n"
     )

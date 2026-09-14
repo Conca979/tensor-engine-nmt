@@ -1,16 +1,17 @@
 """
-evaluate.py — Corpus BLEU-4 evaluation on the PhoMT test set.
+evaluate.py — Corpus BLEU-4 evaluation on PhoMT splits (test, train, val).
 
-Translates test.en using the trained model and compares to test.vi references.
+Translates {split}.en using the trained model and compares to {split}.vi references.
 Reports:
   - Corpus BLEU-4 with brevity penalty
   - Per-line BLEU (optional verbose mode)
 
+Supports sampling a random subset from the split (e.g., train) to check for overfitting.
 BLEU implementation is from scratch (no sacrebleu dependency).
 Reference: Papineni et al. (2002), "BLEU: a Method for Automatic Evaluation of MT"
 
 Run via:
-    tensor-engine-nmt evaluate [--ckpt PATH] [--verbose]
+    tensor-engine-nmt evaluate [--ckpt PATH] [--verbose] [--n N] [--split SPLIT] [--random]
 """
 import os
 import math
@@ -102,21 +103,25 @@ def evaluate(
     hp=cfg,
     verbose: bool = False,
     max_sentences: int = None,
+    split: str = "test",
+    random_sample: bool = False,
 ) -> float:
     """
-    Run BLEU evaluation on the test set.
+    Run BLEU evaluation on the given split.
 
     Parameters
     ----------
     ckpt_path     : path to a .npz checkpoint; if None, auto-finds latest
     verbose       : print per-sentence output
     max_sentences : evaluate only the first N sentences (for quick checks)
+    split         : dataset split to evaluate (test, train, val)
+    random_sample : if True, shuffles the dataset before picking max_sentences
 
     Returns
     -------
     corpus BLEU-4 score (0–100)
     """
-    import glob, re
+    import glob, re, random
     def _step_num(p):
         m = re.search(r'step_(\d+)', p)
         return int(m.group(1)) if m else -1
@@ -135,45 +140,54 @@ def evaluate(
 
     translator = Translator(model, bpe, hp)
 
-    # ── Read test files ───────────────────────────────────────────────────────
-    en_path = os.path.join(hp.data_dir, "test", "test.en")
-    vi_path = os.path.join(hp.data_dir, "test", "test.vi")
+    # ── Read files ───────────────────────────────────────────────────────
+    en_path = os.path.join(hp.data_dir, split, f"{split}.en")
+    vi_path = os.path.join(hp.data_dir, split, f"{split}.vi")
 
     hypotheses = []
     references  = []
     count = 0
 
+    print(f"Reading {split} set...")
     with open(en_path, "r", encoding="utf-8") as fen, \
          open(vi_path, "r", encoding="utf-8") as fvi:
+        
+        pairs = []
         for en_line, vi_line in zip(fen, fvi):
             en_line = en_line.strip()
             vi_line = vi_line.strip()
             if not en_line or not vi_line:
                 continue
+            pairs.append((en_line, vi_line))
+            
+    if random_sample:
+        random.seed(42)
+        random.shuffle(pairs)
+        
+    if max_sentences:
+        pairs = pairs[:max_sentences]
 
-            hyp = translator.translate(en_line, method="greedy")
-            hyp_tokens = hyp.split()
-            ref_tokens = vi_line.lower().split()
+    for en_line, vi_line in pairs:
+        hyp = translator.translate(en_line, method="greedy")
+        hyp_tokens = hyp.split()
+        ref_tokens = vi_line.lower().split()
 
-            hypotheses.append(hyp_tokens)
-            references.append(ref_tokens)
-            count += 1
+        hypotheses.append(hyp_tokens)
+        references.append(ref_tokens)
+        count += 1
 
-            if verbose:
-                sent_score = sentence_bleu(hyp_tokens, ref_tokens)
-                print(f"[{count:5d}]  EN: {en_line}")
-                print(f"         HY: {hyp}")
-                print(f"         RE: {vi_line}")
-                print(f"         BLEU: {sent_score:.4f}\n")
-            elif count % 500 == 0:
-                print(f"  Evaluated {count} sentences…")
-
-            if max_sentences and count >= max_sentences:
-                break
+        if verbose:
+            sent_score = sentence_bleu(hyp_tokens, ref_tokens)
+            print(f"[{count:5d}]  EN: {en_line}")
+            print(f"         HY: {hyp}")
+            print(f"         RE: {vi_line}")
+            print(f"         BLEU: {sent_score:.4f}\n")
+        elif count % 500 == 0:
+            print(f"  Evaluated {count} sentences…")
 
     bleu = corpus_bleu(hypotheses, references)
     print(f"\n{'='*50}")
-    print(f"  Corpus BLEU-4 ({count} sentences): {bleu:.2f}")
+    print(f"  Corpus BLEU-4 ({split} set, {count} sentences): {bleu:.2f}")
     print(f"{'='*50}")
     return bleu
 
@@ -183,8 +197,10 @@ def main_evaluate():
     parser.add_argument("--ckpt",    type=str,  default=None, help="Checkpoint path")
     parser.add_argument("--verbose", action="store_true",     help="Print per-sentence output")
     parser.add_argument("--n",       type=int,  default=None, help="Evaluate first N sentences")
+    parser.add_argument("--split",   type=str,  default="test", help="Data split to evaluate (test, train, val)")
+    parser.add_argument("--random",  action="store_true",     help="Randomly sample sentences from the split")
     args = parser.parse_args()
-    evaluate(ckpt_path=args.ckpt, verbose=args.verbose, max_sentences=args.n)
+    evaluate(ckpt_path=args.ckpt, verbose=args.verbose, max_sentences=args.n, split=args.split, random_sample=args.random)
 
 
 # Alias for backward compatibility and Colab guide
