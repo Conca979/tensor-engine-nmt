@@ -55,6 +55,15 @@ def zip_folder(folder_path, out_zip=None):
                 rel = os.path.relpath(full, os.path.dirname(folder_path) or ".")
                 arcname = rel.replace("\\", "/")
                 zf.write(full, arcname=arcname)
+        
+        # Also zip any cache files residing in the root directory into this folder archive
+        if folder_name == "PhoMT_dataset":
+            import glob
+            for pkl_file in glob.glob("*_cache_*.pkl"):
+                arcname = f"{folder_name}/{pkl_file}"
+                print(f"  + Including {pkl_file} -> {arcname}")
+                zf.write(pkl_file, arcname=arcname)
+
     print(f"Success! Created {out_zip} (All paths verified with POSIX '/')")
 
 
