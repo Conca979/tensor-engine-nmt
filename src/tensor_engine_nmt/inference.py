@@ -50,9 +50,25 @@ class Translator:
         """Perform Stage 3 handoff for a single sentence (B=1)."""
         hp = self.hp
         L  = hp.L
+        d_half = hp.d // 2
         idx = Xlen[0] - 1
-        h_dec = [h_enc_all[l][0:1, idx:idx+1, :].squeeze(1).copy() for l in range(L)]
-        C_dec = [C_enc_all[l][0:1, idx:idx+1, :].squeeze(1).copy() for l in range(L)]
+        # Forward half: last real encoder step (has seen full left context).
+        # Backward half: t=0 is the backward LSTM's last computed step
+        #                (has seen the full sentence from right to left).
+        h_dec = [
+            xp.concatenate([
+                h_enc_all[l][0:1, idx:idx+1, :d_half].squeeze(1),
+                h_enc_all[l][0:1, 0:1,       d_half:].squeeze(1),
+            ], axis=1).copy()
+            for l in range(L)
+        ]
+        C_dec = [
+            xp.concatenate([
+                C_enc_all[l][0:1, idx:idx+1, :d_half].squeeze(1),
+                C_enc_all[l][0:1, 0:1,       d_half:].squeeze(1),
+            ], axis=1).copy()
+            for l in range(L)
+        ]
         return h_dec, C_dec
 
     # ── Greedy decode ─────────────────────────────────────────────────────────

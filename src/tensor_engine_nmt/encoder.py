@@ -268,11 +268,12 @@ class EncoderLSTM:
                 tanh_C = xp.tanh(C_cur)
                 do_pre = dh_out * tanh_C * sigmoid_deriv(o)
                 dC_cur = dh_out * o * tanh_deriv(tanh_C) + dC_next_bwd
-                
+
                 if dC_enc_final is not None:
-                    # Inject cell handoff gradient
-                    mask_t = (xp.asarray(Xlen) - 1 == t) # (B,)
-                    dC_cur = dC_cur + dC_enc_final[l][:, d_half:] * mask_t[:, None]
+                    # Inject cell handoff gradient at the backward LSTM's final
+                    # step: t=0 (the backward sweep ends at the first position).
+                    if t == 0:
+                        dC_cur = dC_cur + dC_enc_final[l][:, d_half:]
                 
                 df_pre = dC_cur * C_prev * sigmoid_deriv(f)
                 di_pre = dC_cur * g * sigmoid_deriv(i)

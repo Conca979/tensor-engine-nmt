@@ -123,12 +123,19 @@ class DecoderLSTM:
 
         h_dec = []
         C_dec = []
+        d_half = hp.d // 2
         for l in range(L):
-            # h_enc_all[l] is (B, Tx, d) → gather at [:, idx, :]
-            h_f = h_enc_all[l][b_idx, idx_xp, :]                  # (B, d)
-            C_f = C_enc_all[l][b_idx, idx_xp, :]                  # (B, d)
-            h_dec.append(h_f.copy())
-            C_dec.append(C_f.copy())
+            # h_enc_all[l] is (B, Tx, d).
+            # Forward half  → last real token (idx) has seen the full left context.
+            # Backward half → t=0 is where the backward LSTM *finishes* after
+            #                 sweeping right-to-left; that state summarises the whole
+            #                 sentence from right to left.
+            h_fwd = h_enc_all[l][b_idx, idx_xp, :d_half]          # (B, d/2)
+            h_bwd = h_enc_all[l][b_idx, 0,      d_half:]          # (B, d/2)
+            C_fwd = C_enc_all[l][b_idx, idx_xp, :d_half]          # (B, d/2)
+            C_bwd = C_enc_all[l][b_idx, 0,      d_half:]          # (B, d/2)
+            h_dec.append(xp.concatenate([h_fwd, h_bwd], axis=1).copy())  # (B, d)
+            C_dec.append(xp.concatenate([C_fwd, C_bwd], axis=1).copy())  # (B, d)
 
         # ── Teacher forcing probability for this batch ────────────────────────
         # Enforce the anchor threshold via hp.min_tf (prevent exposure bias trap)
