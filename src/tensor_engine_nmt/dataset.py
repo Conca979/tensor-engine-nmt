@@ -102,7 +102,7 @@ class PhoMTDataset:
         bpe: BPETokenizer,
         data_dir: str = cfg.data_dir,
         split: str = "train",
-        max_len: int = 30,
+        max_len: int = cfg.max_len,   # driven by hp.max_len — single source of truth
     ):
         self.bpe = bpe
         self.en_path = os.path.join(data_dir, split, f"{split}.en")

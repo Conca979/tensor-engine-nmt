@@ -22,6 +22,15 @@ class HParams:
     d: int = 1024            # LSTM hidden size (per layer, one direction)
     L: int = 3               # number of stacked LSTM layers (encoder & decoder)
 
+    # ── Length budget ────────────────────────────────────────────────────────
+    # max_len is the SINGLE source of truth for sequence length filtering.
+    # Applied at three places:
+    #   1. dataset.py  — filters training pairs (both EN and VI sides)
+    #   2. evaluate.py — filters eval pairs identically so metrics are comparable
+    #   3. inference.py max_decode_len — hard cap on decoder output length
+    # Rule: max_decode_len should always equal max_len so inference matches training.
+    max_len: int = 30        # max BPE token count for either side (EN or VI)
+
     # ── Training ────────────────────────────────────────────────────────────
     max_tokens: int = 4000   # maximum tokens per batch
     B: int = 64              # default batch size (used for unit testing and fixed-batch evaluation)
@@ -38,7 +47,7 @@ class HParams:
 
     # ── Inference ───────────────────────────────────────────────────────────
     beam_width: int = 4
-    max_decode_len: int = 30
+    max_decode_len: int = 30  # safety cap on decoder output — keep == max_len
 
     # ── Logging / checkpointing ──────────────────────────────────────────────
     log_every: int = 100

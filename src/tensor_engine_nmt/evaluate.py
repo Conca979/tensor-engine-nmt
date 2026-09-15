@@ -6,18 +6,22 @@ Reports:
   - Corpus BLEU-4 with brevity penalty
   - Per-line BLEU (optional verbose mode)
 
-Supports sampling a random subset from the split (e.g., train) to check for overfitting.
-BLEU implementation is from scratch (no sacrebleu dependency).
-Reference: Papineni et al. (2002), "BLEU: a Method for Automatic Evaluation of MT"
+Length filtering (IMPORTANT):
+  By default, evaluation applies the **same** BPE length filter as training
+  (hp.max_len). Sentences where either the EN or VI side exceeds hp.max_len
+  BPE tokens are skipped — identical to how the training dataset filters them.
+  This ensures BLEU is measured on the same distribution the model was trained on.
+  Pass --no-filter to evaluate the full unfiltered test set instead.
 
 Run via:
-    tensor-engine-nmt evaluate [--ckpt PATH] [--verbose] [--n N] [--split SPLIT] [--random]
+    tensor-engine-nmt evaluate [--ckpt PATH] [--verbose] [--n N] [--split SPLIT]
+                                [--random] [--no-filter]
 """
 import os
 import math
 import argparse
 from collections import Counter
-from typing import List, Tuple
+from typing import List, Optional
 
 from .config import cfg
 from .bpe import load_or_train_bpe
