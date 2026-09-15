@@ -227,7 +227,7 @@ tensor-engine-nmt/
 │   └── test_overfit.py
 ├── docs/
 │   ├── implementation_plan.md      ← As-built architecture reference
-│   ├── unidirectional_pipeline.md  ← Mathematical walkthrough
+│   ├── bidirectional_pipeline.md  ← Mathematical walkthrough
 │   └── training_guide.md           ← Operational guide: resume, Colab, logs
 ├── analyze.py           ← Training log & evaluation result analyser
 ├── PhoMT_dataset/       ← EN/VI parallel corpus (train / test splits)
