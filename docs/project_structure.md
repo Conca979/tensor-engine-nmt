@@ -28,6 +28,8 @@ tensor-engine-nmt/
 ├── docs/                   # Documentation and Guides
 │   ├── bidirectional_pipeline.md
 │   ├── bugfix_report.md      # Backward-pass fixes, evidence, next steps
+│   ├── commit_rules.md       # Conventional commits rules and git workflow standard
+│   ├── naming_conventions.md # Official tensor naming, dimensions, and symbols
 │   ├── project_structure.md
 │   ├── short_session_training.md  # Training in short bursts (slow hardware / limited GPU hours)
 │   ├── Teacher_Forcing_in_NMT_Google_Production.md
@@ -91,6 +93,8 @@ tensor-engine-nmt/
 The `docs/` folder and root guides contain extensive documentation explaining the mathematical and engineering decisions behind the project:
 
 - **[README.md](../README.md)**: The primary entry point. Contains the architectural overview, installation instructions, and quickstart commands.
+- **[naming_conventions.md](naming_conventions.md)**: Official guide for tensor shapes (`B`, `Tx`, `Ty`, `d`), mathematical notation, LSTM gate weights, backpropagation variables, and file naming conventions.
+- **[commit_rules.md](commit_rules.md)**: Repository git commit conventions, allowed types/scopes, and forbidden artifact guardrails.
 - **[bidirectional_pipeline.md](bidirectional_pipeline.md)**: A deep dive into how the Bidirectional LSTM encoder works, including the mathematics of concatenating forward and backward states and the impact on the attention mechanism.
 - **[Teacher_Forcing_in_NMT_Google_Production.md](Teacher_Forcing_in_NMT_Google_Production.md)**: Explains the concept of Scheduled Sampling / Teacher Forcing, why it's critical to prevent "exposure bias," and how the inverse-sigmoid decay schedule is implemented.
 - **[training_guide.md](training_guide.md)**: Comprehensive guide on how to train the model, manage checkpoints, resume interrupted runs, and diagnose common training issues (like loss spikes).

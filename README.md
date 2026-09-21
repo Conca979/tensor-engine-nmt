@@ -320,6 +320,8 @@ tensor-engine-nmt/
 ├── docs/
 │   ├── implementation_plan.md      ← As-built architecture reference
 │   ├── bidirectional_pipeline.md  ← Mathematical walkthrough
+│   ├── naming_conventions.md      ← Tensor shapes, symbols, and naming rules
+│   ├── commit_rules.md            ← Git commit rules and workflow standard
 │   ├── short_session_training.md  ← Training in short bursts (START HERE if slow)
 │   ├── bugfix_report.md           ← Backward-pass fixes, evidence and next steps
 │   └── training_guide.md           ← Operational guide: resume, logs, troubleshooting
@@ -328,6 +330,7 @@ tensor-engine-nmt/
 ├── bpe_vocab/           ← Auto-generated BPE vocab (merges.txt, vocab.json)
 ├── checkpoints/         ← step_N.npz (weights) + optim_state.npz (Adam state)
 ├── README.md
+├── CONTRIBUTING.md      ← Contribution guidelines and conventional commit rules
 ├── COLAB_GUIDE.md       ← Step-by-step Google Colab training guide
 └── pyproject.toml
 ```
