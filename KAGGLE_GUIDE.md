@@ -247,7 +247,7 @@ assert BACKEND == "cupy", "CRITICAL ERROR: CuPy is not active! Make sure GPU Acc
 ---
 
 ### Cell 2: Data & Checkpoint Preparation
-**What this does:** Recursively locates `PhoMT_dataset/` and your checkpoints in `/kaggle/input/`, copies them into the writable `/kaggle/working/` directory, and verifies the files.
+**What this does:** Recursively locates `phomt-dataset/` and your checkpoints in `/kaggle/input/`, copies them into the writable `/kaggle/working/` directory, and verifies the files.
 
 ```python
 import os
@@ -255,15 +255,15 @@ import os
 # 1. Recursively locate PhoMT_dataset
 dataset_src = None
 for root, dirs, files in os.walk('/kaggle/input'):
-    if 'PhoMT_dataset' in dirs:
-        dataset_src = os.path.join(root, 'PhoMT_dataset')
+    if 'phomt-dataset' in dirs:
+        dataset_src = os.path.join(root, 'phomt-dataset')
         break
-    elif os.path.basename(root) == 'PhoMT_dataset':
+    elif os.path.basename(root) == 'phomt-dataset':
         dataset_src = root
         break
 
 print(f"Found dataset at: {dataset_src}")
-!cp -r {dataset_src} ./PhoMT_dataset
+!cp -r {dataset_src} ./phomt-dataset
 
 # 2. Recursively locate checkpoints (folder containing .npz files)
 ckpt_src = None
