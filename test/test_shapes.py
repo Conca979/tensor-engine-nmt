@@ -59,15 +59,15 @@ def test_encoder_shapes():
     assert h_enc_all.shape == (L, B, Tx, d)
     assert C_enc_all.shape == (L, B, Tx, d)
 
-    # Per-step embedding: (B, e)
-    x_t = cache["x_emb"][:, 0, :]
+    # Layer 0 input step 0: (B, e)
+    x_t = cache["inp_cache"][0][0]
     assert x_t.shape == (B, e),          f"x_t shape: {x_t.shape}"
 
-    # Per-step per-layer h: (B, d)
-    h_l_t = cache["h_cache"][0][1]
-    assert h_l_t.shape == (B, d),        f"h_cache[0][1] shape: {h_l_t.shape}"
+    # Per-step per-direction h: (B, d // 2)
+    h_fwd_t = cache["h_cache_fwd"][0][1]
+    assert h_fwd_t.shape == (B, d // 2), f"h_cache_fwd[0][1] shape: {h_fwd_t.shape}"
 
-    print("✓ encoder shapes OK")
+    print("[OK] encoder shapes OK")
 
 
 def test_attention_shapes():
@@ -89,13 +89,13 @@ def test_attention_shapes():
 
     # Rows must sum to 1
     row_sums = np.abs(float(alpha_t.sum(axis=1)[0]) - 1.0)
-    assert row_sums < 1e-5, f"alpha_t row sum ≠ 1: {alpha_t.sum(axis=1)}"
+    assert row_sums < 1e-5, f"alpha_t row sum != 1: {alpha_t.sum(axis=1)}"
 
     # Padding position of example 1 must have ≈ 0 weight
     pad_weight = float(alpha_t[1, 2])
     assert pad_weight < 1e-6, f"Padding attention weight too large: {pad_weight}"
 
-    print("✓ attention shapes OK")
+    print("[OK] attention shapes OK")
 
 
 def test_decoder_shapes():
@@ -133,7 +133,7 @@ def test_decoder_shapes():
     y_t = cache["y_emb_cache"][0]
     assert y_t.shape == (B, e),          f"y_t shape: {y_t.shape}"
 
-    print("✓ decoder shapes OK")
+    print("[OK] decoder shapes OK")
 
 
 def test_loss_shapes():
@@ -157,7 +157,7 @@ def test_loss_shapes():
     # p : (B, Ty, V)  rows sum to 1
     assert p.shape == (B, Ty, V),        f"p shape: {p.shape}"
     row_sums = float(p[0, 0, :].sum())
-    assert abs(row_sums - 1.0) < 1e-5,  f"p row sum ≠ 1: {row_sums}"
+    assert abs(row_sums - 1.0) < 1e-5,  f"p row sum != 1: {row_sums}"
 
     # mask : (B, Ty)
     assert mask_f.shape == (B, Ty),      f"mask shape: {mask_f.shape}"
@@ -166,7 +166,7 @@ def test_loss_shapes():
     dlogits = loss_module.backward(p, Yout, mask_f)
     assert dlogits.shape == (B, Ty, V),  f"dlogits shape: {dlogits.shape}"
 
-    print("✓ loss shapes OK")
+    print("[OK] loss shapes OK")
 
 
 def test_full_forward_backward():
@@ -187,7 +187,7 @@ def test_full_forward_backward():
     for (p, g) in model.parameters():
         g_np = g if isinstance(g, np.ndarray) else g.__array__()
         if g_np.any():
-            print("✓ full forward+backward OK (gradients non-zero)")
+            print("[OK] full forward+backward OK (gradients non-zero)")
             return
 
     raise AssertionError("All gradients are zero after backward — something is wrong.")
@@ -199,4 +199,4 @@ if __name__ == "__main__":
     test_decoder_shapes()
     test_loss_shapes()
     test_full_forward_backward()
-    print("\n✅  All shape tests passed.")
+    print("\nAll shape tests passed.")
