@@ -23,9 +23,14 @@ def main() -> None:
         from .train import main_train
         main_train()
 
+    elif cmd == "bench":
+        from .bench import main_bench
+        main_bench()
+
     elif cmd == "translate":
         import glob
         import os
+        import re
         from .config import cfg
         from .bpe import load_or_train_bpe
         from .model import Seq2Seq
@@ -33,11 +38,24 @@ def main() -> None:
 
         bpe   = load_or_train_bpe()
         model = Seq2Seq(cfg)
-        ckpts = sorted(glob.glob(os.path.join(cfg.ckpt_dir, "*.npz")))
+        ckpts = []
+        for f in glob.glob(os.path.join(cfg.ckpt_dir, "*.npz")):
+            base = os.path.basename(f)
+            # Skip the Adam companion file and anything that is not a checkpoint
+            # (e.g. a dataset.npz bundle dropped in the same directory).
+            if "optim" in base.lower():
+                continue
+            m = re.search(r"(?:step|epoch)_(\d+)", base)
+            if not m:
+                continue
+            # A step checkpoint wins over an epoch checkpoint with the same number.
+            ckpts.append((int(m.group(1)), base.startswith("step_"), f))
+        ckpts.sort(key=lambda x: (x[0], x[1]))
         if ckpts:
-            model.load(ckpts[-1])
+            print(f"[model] Loaded checkpoint: {ckpts[-1][2]}")
+            model.load(ckpts[-1][2])
         else:
-            print("[WARNING] No checkpoint found — using untrained weights.")
+            print("[WARNING] No checkpoint found in 'checkpoints/' — using untrained weights.")
         Translator(model, bpe, cfg).interactive()
 
     elif cmd == "evaluate":
@@ -55,7 +73,12 @@ def _print_help() -> None:
         "tensor-engine-nmt — EN→VI NMT\n"
         "\n"
         "Commands:\n"
-        "  train      Train the model (--max-steps N  --resume PATH  --lr LR  --min-tf TF)\n"
+        "  bench      Measure tok/s and hours-per-epoch on THIS machine (start here)\n"
+        "  train      Train the model\n"
+        "               --preset gpu|laptop   --max-minutes N     --save-every N\n"
+        "               --keep-last N         --max-pairs N       --lr LR\n"
+        "               --k K                 --min-tf TF         --max-tokens N\n"
+        "               --max-steps N         --resume PATH\n"
         "  translate  Interactive translation REPL\n"
         "  evaluate   Corpus BLEU-4 evaluation (--ckpt PATH  --verbose  --n N  --split SPLIT  --random)\n"
     )

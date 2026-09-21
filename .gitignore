@@ -20,11 +20,13 @@ PhoMT_dataset/*
 
 # ── Checkpoints & Model Weights (Saved to /kaggle/working/ or Drive) ──
 checkpoints/
+checkpoints_laptop/
 *.npz
 state.txt
 
 # ── Auto-generated Tokenizer Vocabularies ──
 bpe_vocab/
+bpe_vocab_laptop/
 bpe_vocab_smoke/
 
 # ── Training Logs & Evaluation Dumps ──
@@ -47,5 +49,10 @@ draft.txt
 *.swp
 *~
 .DS_Store
-Thumbs.db
 Desktop.ini
+
+# ── PyTorch Transformer experiment (standalone, not part of main project) ──
+torch_experiment/
+
+# Implementation verification
+verification/
