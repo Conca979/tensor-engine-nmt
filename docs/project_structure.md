@@ -21,18 +21,33 @@ tensor-engine-nmt/
 │       ├── inference.py    # Beam search and translation generation
 │       ├── init_weights.py # Weight initialization (Xavier, etc.)
 │       ├── loss.py         # Masked Cross-Entropy Loss
-│       ├── model.py        # Top-level Seq2Seq architecture
+│       ├── model.py        # Top-level Seq2Seq architecture; atomic checkpoints
 │       ├── optimizer.py    # Adam Optimizer implementation
-│       └── train.py        # Training loop and scheduled sampling
+│       ├── bench.py        # Measures tok/s and hours-per-epoch on the local machine
+│       └── train.py        # Training loop, time budgets and scheduled sampling
 ├── docs/                   # Documentation and Guides
 │   ├── bidirectional_pipeline.md
+│   ├── bugfix_report.md      # Backward-pass fixes, evidence, next steps
 │   ├── project_structure.md
+│   ├── short_session_training.md  # Training in short bursts (slow hardware / limited GPU hours)
 │   ├── Teacher_Forcing_in_NMT_Google_Production.md
 │   └── training_guide.md
+├── test/                   # Test suite (runnable as scripts or via pytest)
+│   ├── test_shapes.py
+│   ├── test_gradients.py   # Finite-difference gate for the manual BPTT
+│   ├── test_overfit.py
+│   ├── test_smoke.py       # BPE → cache → batching → train step
+│   ├── test_checkpoint.py  # save/load, stale & truncated checkpoint handling
+│   └── test_short_session.py  # presets, --max-minutes stop/resume, --keep-last
+├── verification/           # Targeted diagnostics + before/after evidence
+│   ├── verify_bugs.py
+│   ├── verify_padding_leak.py
+│   └── compare_ab.py
 ├── bpe_vocab/              # Saved BPE vocabularies and merges
 ├── checkpoints/            # Saved model checkpoints and training logs
 ├── PhoMT_dataset/          # (Ignored) Dataset files
-├── analyze.py              # Script to analyze training logs and plot metrics
+├── demo.py                 # Live interactive translation REPL with beam/greedy decoding
+├── analyze.py              # Script to analyze training logs and evaluation results
 ├── zip_for_kaggle.py       # Deployment script to bundle code for Kaggle
 ├── COLAB_GUIDE.md          # Guide for training/evaluating on Google Colab
 ├── KAGGLE_GUIDE.md         # Guide for training on Kaggle
@@ -65,8 +80,9 @@ tensor-engine-nmt/
 - **`train.py`**: The main training loop. It handles data iteration, forward/backward passes, optimizer steps, logging, checkpointing, and dynamically manages **Teacher Forcing** (scheduled sampling).
 
 ### 5. Evaluation & Inference
-- **`inference.py`**: Contains the `Translator` class, implementing **Beam Search** to find the most probable sentence output rather than just greedily taking the argmax at each step.
-- **`evaluate.py`**: Implements the BLEU-4 metric (from scratch) to evaluate the model's translation accuracy against ground-truth references.
+- **`inference.py`**: Contains the `Translator` class, implementing **Beam Search** (with length normalization and repetition penalty) and Greedy search to find high-probability translations.
+- **`evaluate.py`**: Implements length-filtered Corpus BLEU-4 evaluation (defaulting to Beam Search) and auto-appends structured logs to `checkpoints/evaluation_result.txt`.
+- **`demo.py`**: Interactive live translation terminal application with automatic checkpoint detection, interactive commands (`:mode`, `:beam`, `:ckpt`), and latency metrics.
 
 ---
 
