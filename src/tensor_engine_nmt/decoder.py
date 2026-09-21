@@ -81,7 +81,7 @@ class DecoderLSTM:
     # ── Helpers ───────────────────────────────────────────────────────────────
 
     @staticmethod
-    def _teacher_forcing_prob(global_step: int, k: float, min_tf: float = 0.0) -> float:
+    def _teacher_forcing_prob(global_step: int, k: float, min_tf: float = cfg.min_tf) -> float:
         """ε_i = max(min_tf, k / (k + exp(i/k)))"""
         raw_prob = float(k / (k + np.exp(global_step / k)))
         return max(min_tf, raw_prob)
@@ -139,7 +139,7 @@ class DecoderLSTM:
 
         # ── Teacher forcing probability for this batch ────────────────────────
         # Enforce the anchor threshold via hp.min_tf (prevent exposure bias trap)
-        epsilon = self._teacher_forcing_prob(global_step, hp.k, getattr(hp, "min_tf", 0.7))
+        epsilon = self._teacher_forcing_prob(global_step, hp.k, hp.min_tf)
 
         # ── Initialise caches ─────────────────────────────────────────────────
         h_cache    = [[None] * (Ty + 1) for _ in range(L)]
@@ -159,8 +159,16 @@ class DecoderLSTM:
         s_tilde_cache  = []       # (B, d) attentional h per step
         concat_cache   = []       # (B, 2d) before fusion per step
         logits_list    = []       # (B, V) per step
+        attn_caches    = []       # per-step attention cache — see backward()
 
         y_hat_prev = None         # (B,) int32 argmax from previous step
+
+        # Reproducible per-sequence teacher-forcing sampler.  Deriving it from
+        # global_step means a resumed run replays exactly the same decisions.
+        # (A single scalar draw for the whole batch — as this used to do — either
+        # fed ground truth to every sequence or to none, which is both
+        # higher-variance and not what scheduled sampling specifies.)
+        tf_rng = np.random.default_rng(abs(int(global_step)) % (2 ** 32))
 
         # ── Decoder loop: t = 0 … Ty-1 ───────────────────────────────────────
         for t in range(Ty):
@@ -168,11 +176,8 @@ class DecoderLSTM:
             if t == 0:
                 input_ids = Yin_xp[:, 0]                 # always START
             else:
-                use_gt = (np.random.rand() < epsilon)
-                if use_gt:
-                    input_ids = Yin_xp[:, t]
-                else:
-                    input_ids = y_hat_prev                # int32 (B,)
+                use_gt = xp.asarray(tf_rng.random(B) < epsilon)      # (B,) bool
+                input_ids = xp.where(use_gt, Yin_xp[:, t], y_hat_prev).astype(xp.int32)
 
             input_ids_cache.append(input_ids)
 
@@ -206,6 +211,9 @@ class DecoderLSTM:
 
             # Step 6: attention
             z_t, alpha_t = self.attention.forward(s_t, H, Xlen)
+            # Keep THIS step's cache: attention.forward only stores the latest
+            # one in self._cache, and BPTT needs every step's alignment weights.
+            attn_caches.append(self.attention._cache)
             z_t_cache.append(z_t)
             alpha_t_cache.append(alpha_t)
 
@@ -238,6 +246,7 @@ class DecoderLSTM:
             "s_t_cache": s_t_cache,
             "z_t_cache": z_t_cache,
             "alpha_t_cache": alpha_t_cache,
+            "attn_caches": attn_caches,
             "s_tilde_cache": s_tilde_cache,
             "concat_cache": concat_cache,
             "logits_list": logits_list,
@@ -277,6 +286,7 @@ class DecoderLSTM:
         C_cache     = cache["C_cache"]
         gates_cache = cache["gates_cache"]
         inp_cache   = cache["inp_cache"]
+        attn_caches = cache["attn_caches"]
 
         # Accumulated gradient into full encoder memory H
         dH = xp.zeros_like(cache["H"])    # (B, Tx, d)
@@ -315,7 +325,11 @@ class DecoderLSTM:
             ds_t_from_fusion = dconcat[:, d:]                # (B, d)
 
             # ── Step 6 backward: attention ───────────────────────────────────
-            ds_t_total, dH_t = self.attention.backward(dz_t_path, ds_t_from_fusion)
+            # Pass THIS step's cache — using the shared self._cache here would
+            # backprop every timestep against the last step's alignment.
+            ds_t_total, dH_t = self.attention.backward(
+                dz_t_path, ds_t_from_fusion, attn_caches[t]
+            )
             dH += dH_t                                       # accumulate into full H
 
             # ds_t_total is the gradient into s_t = h_dec[L-1]

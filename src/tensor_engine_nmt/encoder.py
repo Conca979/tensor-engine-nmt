@@ -72,6 +72,13 @@ class EncoderLSTM:
 
         x_emb = self.Ex[X]       # (B, Tx, e)
 
+        # Real-vs-padding mask.  Padding sits at t >= Xlen[b] for every sequence.
+        # The forward sweep needs no masking (pads only feed later pads), but the
+        # backward sweep visits pads FIRST, so without this the state carried
+        # into the real tokens — and therefore the decoder handoff — depends on
+        # how much padding the batch happens to contain.
+        Xlen_arr = xp.asarray(Xlen)
+
         # Storage for BPTT
         h_cache_fwd = [[None] * (Tx + 1) for _ in range(L)]
         C_cache_fwd = [[None] * (Tx + 1) for _ in range(L)]
@@ -142,6 +149,13 @@ class EncoderLSTM:
                 
                 C_bwd = f * C_bwd + i * g
                 h_bwd = o * xp.tanh(C_bwd)
+
+                # Discard padding steps: zeroing here (not just at the next
+                # step's input) also clears h_cache_bwd[l][t], which the backward
+                # pass reads as h_prev, and keeps H clean at padded positions.
+                alive = (t < Xlen_arr).astype(f32)[:, None]      # (B, 1)
+                h_bwd = h_bwd * alive
+                C_bwd = C_bwd * alive
                 
                 h_cache_bwd[l][t] = h_bwd
                 C_cache_bwd[l][t] = C_bwd
@@ -197,12 +211,26 @@ class EncoderLSTM:
         dLayer_output = [xp.zeros((B, Tx, d), dtype=f32) for _ in range(L)]
         dLayer_output[L - 1] = dLayer_output[L - 1] + dH
 
-        # Inject handoff gradients at the last meaningful step (Stage 3 backward)
+        Xlen_xp = xp.asarray(Xlen)
+
+        # Inject handoff gradients from Stage 3 (decoder initialisation).
+        #
+        # The decoder reads the handoff as  [ h_fwd @ t=Xlen-1 | h_bwd @ t=0 ]
+        # (see decoder.forward), so the two halves of the incoming gradient
+        # belong to DIFFERENT timesteps:
+        #   * forward half  -> the last real position, t = Xlen-1
+        #   * backward half -> t = 0, where the right-to-left sweep finishes
+        # Injecting the whole vector at Xlen-1 (as this used to do) sent the
+        # backward half to the wrong step and left t=0 with no gradient at all.
         if dh_enc_final is not None:
-            Xlen_arr = xp.asarray(Xlen)
-            mask = (xp.arange(Tx)[None, :] == (Xlen_arr[:, None] - 1)) # (B, Tx)
+            mask_last = (xp.arange(Tx)[None, :] == (Xlen_xp[:, None] - 1))  # (B, Tx)
+            mask_zero = (xp.arange(Tx)[None, :] == 0)                       # (1, Tx)
             for l in range(L):
-                dLayer_output[l] = dLayer_output[l] + dh_enc_final[l][:, None, :] * mask[:, :, None]
+                g  = dh_enc_final[l]                                  # (B, d)
+                fw = xp.concatenate([g[:, :d_half], xp.zeros_like(g[:, d_half:])], axis=1)
+                bw = xp.concatenate([xp.zeros_like(g[:, :d_half]), g[:, d_half:]], axis=1)
+                dLayer_output[l] = dLayer_output[l] + fw[:, None, :] * mask_last[:, :, None]
+                dLayer_output[l] = dLayer_output[l] + bw[:, None, :] * mask_zero[:, :, None]
 
         dEx_np = np.zeros((hp.V, hp.e), dtype=np.float32)
 
@@ -257,7 +285,14 @@ class EncoderLSTM:
             dC_next_bwd = xp.zeros((B, d_half), dtype=f32)
             
             for t in range(Tx):
-                dh_out = dLayer_output[l][:, t, d_half:] + dh_next_bwd
+                # forward() multiplied this step's h/C by `alive` before storing
+                # them.  The stored values are what the graph actually consumes
+                # (h_cache_bwd[l][t+1] is the next step's h_prev), so anything
+                # arriving at a padded step is a gradient w.r.t. a constant zero
+                # and must be dropped here.
+                alive_t = (t < Xlen_xp).astype(f32)[:, None]     # (B, 1)
+
+                dh_out = (dLayer_output[l][:, t, d_half:] + dh_next_bwd) * alive_t
                 
                 f, i, g, o = gates_bwd[l][t]
                 h_prev = h_cache_bwd[l][t + 1] 
@@ -267,7 +302,7 @@ class EncoderLSTM:
                 
                 tanh_C = xp.tanh(C_cur)
                 do_pre = dh_out * tanh_C * sigmoid_deriv(o)
-                dC_cur = dh_out * o * tanh_deriv(tanh_C) + dC_next_bwd
+                dC_cur = (dh_out * o * tanh_deriv(tanh_C) + dC_next_bwd) * alive_t
 
                 if dC_enc_final is not None:
                     # Inject cell handoff gradient at the backward LSTM's final

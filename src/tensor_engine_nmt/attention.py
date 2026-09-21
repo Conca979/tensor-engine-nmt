@@ -97,16 +97,27 @@ class LuongAttention:
         self,
         dz_t:    "xp.ndarray",   # (B, d) gradient into context vector
         ds_t_in: "xp.ndarray",   # (B, d) gradient into s_t from other paths
+        cache:   dict = None,    # per-timestep cache from forward(); see note
     ) -> tuple:
         """
         Backprop through the attention computation.
+
+        Parameters
+        ----------
+        cache : the dict returned in `forward`'s `self._cache` for THIS
+            timestep.  Callers that run attention inside a loop (the decoder
+            does, once per output token) MUST pass it explicitly: `self._cache`
+            only ever holds the most recent forward call, so reusing it across
+            timesteps would backprop every step against the final step's
+            alignment weights and score vector.  Defaults to `self._cache` so
+            single-step callers keep working.
 
         Returns
         -------
         ds_t  : float32 (B, d)     — gradient into decoder hidden s_t
         dH_t  : float32 (B, Tx, d) — gradient into encoder memory H at this step
         """
-        cache   = self._cache
+        cache   = self._cache if cache is None else cache
         alpha_t = cache["alpha_t"]
         temp    = cache["temp"]
         s_t     = cache["s_t"]
