@@ -57,11 +57,11 @@ class HParams:
     max_decode_len: int = 30  # safety cap on decoder output — keep == max_len
 
     # ── Logging / checkpointing ──────────────────────────────────────────────
-    log_every: int = 100
+    log_every: int = 200
     save_every: int = 4000
     # After each save, keep only the newest N step_*.npz files (None = keep all).
     # Short-session training wants frequent saves; this stops them filling the disk.
-    keep_last: Optional[int] = None
+    keep_last: Optional[int] = 2
 
     # ── Paths ────────────────────────────────────────────────────────────────
     data_dir: str = "PhoMT_dataset"
