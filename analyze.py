@@ -33,7 +33,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 # ── Config ────────────────────────────────────────────────────────────────────
 LOG_PATH  = os.path.join("checkpoints", "train_logs.txt")
-EVAL_PATH = "evaluation_result.txt"
+EVAL_PATH = os.path.join("checkpoints", "evaluation_result.txt") if os.path.exists(os.path.join("checkpoints", "evaluation_result.txt")) else "evaluation_result.txt"
 
 # Teacher-forcing schedule params (must match config.py)
 K_TF = 17_000.0
@@ -326,10 +326,11 @@ def analyze_logs() -> None:
     print(f"  Formula: ε = k / (k + exp(step / k))\n")
     milestones = [
         (0,       "Training start"),
-        (46_000,  "End of epoch 1 (approx)"),
-        (100_000, "~2 epochs"),
-        (200_000, "~4 epochs  ← 50/50 crossover with k=20,000"),
-        (500_000, "~10 epochs ← ε ≈ 0"),
+        (24_600,  "End of epoch 1 (approx)"),
+        (24_600*2,  "End of epoch 2 (approx)"),
+        (24_600*3,  "End of epoch 3 (approx)"),
+        (24_600*4,  "End of epoch 3 (approx)"),
+        (24_600*5,  "End of epoch 3 (approx)"),
         (last["step"], f"Current step ({last['step']:,})"),
     ]
     for step, label in milestones:
@@ -352,11 +353,19 @@ def analyze_logs() -> None:
 def analyze_eval(top_n: int = 5) -> None:
     div("EVALUATION ANALYSIS")
 
-    if not os.path.exists(EVAL_PATH):
-        print(f"  [SKIP] {EVAL_PATH} not found.")
-        return
+    eval_path = EVAL_PATH
+    if not os.path.exists(eval_path):
+        alt = os.path.join("checkpoints", "evaluation_result.txt")
+        if os.path.exists(alt):
+            eval_path = alt
+        elif os.path.exists("evaluation_result.txt"):
+            eval_path = "evaluation_result.txt"
+        else:
+            print(f"  [SKIP] Neither '{eval_path}' nor '{alt}' found.")
+            return
 
-    with open(EVAL_PATH, "r", encoding="utf-8", errors="ignore") as fh:
+    print(f"  Reading evaluation log from: {eval_path}")
+    with open(eval_path, "r", encoding="utf-8", errors="ignore") as fh:
         text = fh.read()
 
     # ── Checkpoint info ───────────────────────────────────────────────────────
@@ -466,19 +475,6 @@ def analyze_eval(top_n: int = 5) -> None:
         sub_bleu = statistics.mean(e["bleu"] for e in subset)
         label = f"    EN length {lo:>3}–{min(hi-1,999):<3}"
         print(f"  {label}  {len(subset):>5} sentences  mean BLEU = {sub_bleu:.4f}")
-
-    # ── n-gram precision drill-down ───────────────────────────────────────────
-    sub("N-gram Precision Drill-down")
-    for n_val in [1, 2, 3, 4]:
-        matched = total = 0
-        for hyp, ref in zip(hyps, refs):
-            h_ng = _ngrams(hyp, n_val)
-            r_ng = _ngrams(ref, n_val)
-            matched += sum(min(c, r_ng.get(ng, 0)) for ng, c in h_ng.items())
-            total   += max(0, len(hyp) - n_val + 1)
-        p = matched / total if total > 0 else 0.0
-        bar = "█" * int(p * 40)
-        print(f"  {n_val}-gram:  {p*100:5.2f}%  [{bar:<40}]  {matched:,} / {total:,}")
 
     # ── Top translations ──────────────────────────────────────────────────────
     sub(f"Top-{top_n} Translations by Sentence BLEU")
